@@ -71,6 +71,30 @@ AliasResult ScopedNoAliasAAResult::alias(const MemoryLocation &LocA,
 
   return AliasResult::MayAlias;
 }
+ModRefInfo ScopedNoAliasAAResult::getModRefInfoFence(const Instruction *Fence,
+                                                     const MemoryLocation &Loc,
+                                                     AAQueryInfo &AAQI) {
+  if (!EnableScopedNoAlias)
+    return ModRefInfo::ModRef;
+
+  assert(Fence->isFenceLike() &&
+         "Instruction should be fence-like for this analysis to apply.");
+
+  const auto AAMetadata = Fence->getAAMetadata();
+
+  // Get the attached MDNodes.
+  const MDNode *AScopes = AAMetadata.Scope, *BScopes = Loc.AATags.Scope;
+
+  const MDNode *ANoAlias = AAMetadata.NoAlias, *BNoAlias = Loc.AATags.NoAlias;
+
+  if (!mayAliasInScopes(AScopes, BNoAlias))
+    return ModRefInfo::NoModRef;
+
+  if (!mayAliasInScopes(BScopes, ANoAlias))
+    return ModRefInfo::NoModRef;
+
+  return ModRefInfo::ModRef;
+}
 
 ModRefInfo ScopedNoAliasAAResult::getModRefInfo(const CallBase *Call,
                                                 const MemoryLocation &Loc,

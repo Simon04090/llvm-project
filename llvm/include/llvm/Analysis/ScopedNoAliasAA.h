@@ -38,6 +38,10 @@ public:
 
   AliasResult alias(const MemoryLocation &LocA, const MemoryLocation &LocB,
                     AAQueryInfo &AAQI, const Instruction *CtxI);
+
+  ModRefInfo getModRefInfoFence(const Instruction *Fence,
+                                const MemoryLocation &Loc, AAQueryInfo &AAQI);
+
   ModRefInfo getModRefInfo(const CallBase *Call, const MemoryLocation &Loc,
                            AAQueryInfo &AAQI);
   ModRefInfo getModRefInfo(const CallBase *Call1, const CallBase *Call2,

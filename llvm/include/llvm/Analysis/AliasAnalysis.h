@@ -669,9 +669,7 @@ public:
   }
 
   /// Assume that values may come from different cycle iterations.
-  void enableCrossIterationMode() {
-    AAQI.MayBeCrossIteration = true;
-  }
+  void enableCrossIterationMode() { AAQI.MayBeCrossIteration = true; }
 
   /// Disable the use of the dominator tree during alias analysis queries.
   void disableDominatorTree() { AAQI.UseDominatorTree = false; }
@@ -734,6 +732,13 @@ public:
   /// Return the behavior when calling the given function.
   virtual MemoryEffects getMemoryEffects(const Function *F) = 0;
 
+  /// getModRefInfo (for fences) - Return information about whether
+  /// a particular fence (logically) modifies or reads the specified memory
+  /// location.
+  virtual ModRefInfo getModRefInfo(const FenceInst *Fence,
+                                   const MemoryLocation &Loc,
+                                   AAQueryInfo &AAQI) = 0;
+
   /// getModRefInfo (for call sites) - Return information about whether
   /// a particular call site modifies or reads the specified memory location.
   virtual ModRefInfo getModRefInfo(const CallBase *Call,
@@ -785,6 +790,10 @@ public:
     return Result.getMemoryEffects(F);
   }
 
+  ModRefInfo getModRefInfo(const FenceInst *Fence, const MemoryLocation &Loc,
+                           AAQueryInfo &AAQI) override {
+    return Result.getModRefInfoFence(Fence, Loc, AAQI);
+  }
   ModRefInfo getModRefInfo(const CallBase *Call, const MemoryLocation &Loc,
                            AAQueryInfo &AAQI) override {
     return Result.getModRefInfo(Call, Loc, AAQI);
@@ -837,6 +846,11 @@ public:
 
   MemoryEffects getMemoryEffects(const Function *F) {
     return MemoryEffects::unknown();
+  }
+
+  ModRefInfo getModRefInfoFence(const Instruction *Fence,
+                                const MemoryLocation &Loc, AAQueryInfo &AAQI) {
+    return ModRefInfo::ModRef;
   }
 
   ModRefInfo getModRefInfo(const CallBase *Call, const MemoryLocation &Loc,
@@ -934,11 +948,11 @@ private:
 
   SmallVector<void (*)(Function &F, FunctionAnalysisManager &AM,
                        AAResults &AAResults),
-              4> ResultGetters;
+              4>
+      ResultGetters;
 
   template <typename AnalysisT>
-  static void getFunctionAAResultImpl(Function &F,
-                                      FunctionAnalysisManager &AM,
+  static void getFunctionAAResultImpl(Function &F, FunctionAnalysisManager &AM,
                                       AAResults &AAResults) {
     AAResults.addAAResult(AM.template getResult<AnalysisT>(F));
     AAResults.addAADependencyID(AnalysisT::ID());
